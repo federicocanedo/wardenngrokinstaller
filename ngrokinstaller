@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+
+import sys, os, json, argparse
+
+def ngrokInstaller(d, n):
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'killall ngrok")
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz'")
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; tar xvzf ngrok-v3-stable-linux-amd64.tgz'")
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; ./ngrok config add-authtoken {n}'")
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; ./ngrok http 80 > /dev/null &'")
+
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; wget http://localhost:4040/api/tunnels'")
+    try:
+        ngrokjson = json.load(os.popen(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; cat tunnels'"))
+        ngrokurl =  f"{ngrokjson['tunnels'][0]['public_url']}/"
+        if ngrokurl:
+            setBaseUrl(d, ngrokurl)
+    except:
+        print("ngrok setup failed")
+
+    
+
+def setBaseUrl(domain, url):
+        os.system(f"docker exec {domain}_php-fpm_1 /bin/bash -c 'bin/magento config:set web/unsecure/base_url {url} --lock-env;'")
+        os.system(f"docker exec {domain}_php-fpm_1 /bin/bash -c 'bin/magento config:set web/secure/base_url {url} --lock-env;'")
+        os.system(f"docker exec {domain}_php-fpm_1 /bin/bash -c 'bin/magento c:f'")
+        print(url)
+
+def main():
+    parser = argparse.ArgumentParser(description = "Warden Magento Installer")
+    parser.add_argument("-H", "--Help", help = "Example: Help argument", required = False, default = "")    
+    parser.add_argument("-d", "--domain", help = "Example: -d 244test", required = True, default = "")
+    parser.add_argument("-n", "--ngrok", help = "Example: -n auth_token", required = False, default = "")
+    parser.add_argument("-r","--remove", default=False, action='store_true')
+
+    argument = parser.parse_args()
+    ngrok = argument.ngrok
+    domain = argument.domain
+    remove = argument.remove
+
+    if ngrok and remove:
+        print ('Cannot use -n and -r at the same time')
+        sys.exit(2)
+
+    if not domain in os.popen("docker ps --format '{{.Names}}' ").read():
+        print ('Domain not found in running containers')
+        sys.exit(2)
+
+    if remove:
+        print(f"Removing ngrok from magento installation {domain}")
+        os.system(f"docker exec {domain}_nginx_1 /bin/bash -c 'killall ngrok")
+        setBaseUrl(domain, f"https://app.{domain}.test/")
+
+    if ngrok:
+        print(f"Setting up ngrok on {domain} with token {ngrok}")
+        ngrokInstaller(domain, ngrok)
+
+if __name__ == "__main__":
+	main()
