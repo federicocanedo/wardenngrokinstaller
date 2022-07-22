@@ -3,7 +3,7 @@
 import sys, os, json, argparse
 
 def ngrokInstaller(d, n):
-    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'killall ngrok")
+    os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; killall ngrok; rm tunnels ngrok-v3-stable-linux-amd64.tgz'")
     os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz'")
     os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; tar xvzf ngrok-v3-stable-linux-amd64.tgz'")
     os.system(f"docker exec {d}_nginx_1 /bin/bash -c 'cd; ./ngrok config add-authtoken {n}'")
@@ -42,7 +42,7 @@ def main():
         print ('Cannot use -n and -r at the same time')
         sys.exit(2)
 
-    if not domain in os.popen("docker ps --format '{{.Names}}' ").read():
+    if not f"\n{domain}_" in os.popen("docker ps --format '{{.Names}}' ").read():
         print ('Domain not found in running containers')
         sys.exit(2)
 
